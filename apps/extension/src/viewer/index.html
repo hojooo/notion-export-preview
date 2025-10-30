@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Preview - Notion Export</title>
+  </head>
+  <body>
+    <div id="viewer-container">
+      <div id="toolbar">
+        <button id="save-btn" title="Save PDF">Save</button>
+        <button id="print-btn" title="Print PDF">Print</button>
+        <button id="download-original-btn" title="Download from Notion">
+          Download Original
+        </button>
+        <span id="filename"></span>
+      </div>
+      <div id="pdf-viewer"></div>
+    </div>
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>
