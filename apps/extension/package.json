@@ -1,0 +1,12 @@
+{
+  "name": "@repo/extension",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Notion Export Preview — Chrome extension",
+  "scripts": {
+    "dev": "echo 'Load unpacked from apps/extension/dist after build'",
+    "build": "rm -rf dist && mkdir -p dist/viewer && cp -f manifest.json sw.js popup.html popup.js dist/ && cp -f viewer/index.html viewer/index.js dist/viewer/",
+    "pack": "npm run build && cd dist && zip -r ../notion-export-preview.zip . -x '*.DS_Store'"
+  }
+}
+
