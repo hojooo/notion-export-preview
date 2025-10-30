@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "composite": true,
     "jsx": "react-jsx",
     "types": ["chrome", "vite/client", "@samrum/vite-plugin-web-extension/client"]
   },

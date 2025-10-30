@@ -1,12 +1,35 @@
 {
-  "name": "@repo/extension",
-  "private": true,
+  "name": "@notion-export-preview/extension",
   "version": "0.1.0",
-  "description": "Notion Export Preview — Chrome extension",
+  "private": true,
+  "description": "Chrome extension for previewing Notion PDF exports",
+  "type": "module",
   "scripts": {
-    "dev": "echo 'Load unpacked from apps/extension/dist after build'",
-    "build": "rm -rf dist && mkdir -p dist/viewer && cp -f manifest.json sw.js popup.html popup.js dist/ && cp -f viewer/index.html viewer/index.js dist/viewer/",
-    "pack": "npm run build && cd dist && zip -r ../notion-export-preview.zip . -x '*.DS_Store'"
+    "dev": "vite",
+    "build": "vite build && npm run postbuild",
+    "postbuild": "mkdir -p dist/pdfjs-dist/build && cp ../../node_modules/pdfjs-dist/build/pdf.worker.js dist/pdfjs-dist/build/",
+    "preview": "vite preview",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "pdfjs-dist": "^3.6.172"
+  },
+  "devDependencies": {
+    "@samrum/vite-plugin-web-extension": "^5.1.0",
+    "@types/chrome": "^0.0.254",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
   }
 }
-

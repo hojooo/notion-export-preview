@@ -13,7 +13,7 @@ export default defineConfig({
         description: pkg.description,
         version: pkg.version,
         manifest_version: 3,
-        permissions: ["downloads", "scripting", "activeTab", "storage"],
+        permissions: ["downloads", "scripting", "activeTab", "storage", "offscreen"],
         host_permissions: [
           "https://www.notion.so/*",
           "https://*.amazonaws.com/*",
@@ -26,9 +26,16 @@ export default defineConfig({
           default_popup: "src/popup/index.html",
           default_title: "Notion Export Preview",
         },
+        content_scripts: [
+          {
+            matches: ["https://*.notion.so/*"],
+            js: ["src/content/index.ts"],
+            run_at: "document_end",
+          },
+        ],
       },
       additionalInputs: {
-        html: ["src/viewer/index.html"],
+        html: ["src/viewer/index.html", "src/offscreen/index.html"],
       },
     }),
   ],

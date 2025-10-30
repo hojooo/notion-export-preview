@@ -15,8 +15,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
-  },
-  "references": [
-    { "path": "./apps/extension" }
-  ]
+  }
 }
