@@ -115,7 +115,7 @@ async function requestScaleChange(scale: number) {
 
   // 이미 캐시에 있으면 즉시 표시
   if (pdfCache.has(scale)) {
-    if (statusElement) statusElement.textContent = "Cached ✓";
+    if (statusElement) statusElement.textContent = "완료!";
     const url = pdfCache.get(scale)!;
     await renderPDF(url);
     if (statusElement) {
@@ -226,7 +226,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       renderPDF(url);
       const statusElement = document.getElementById("scale-status");
       if (statusElement) {
-        statusElement.textContent = "Done!";
+        statusElement.textContent = "완료!";
         setTimeout(() => {
           statusElement.textContent = "";
         }, 2000);

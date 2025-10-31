@@ -28,85 +28,9 @@ let requestedScale: number | null = null;
 let initialScale: number = 100;
 
 /**
- * Viewer Tab ID 저장 (PDF URL 전달용)
+ * Viewer Tab ID (PDF URL 전달용)
  */
 let viewerTabId: number | null = null;
-
-/**
- * Offscreen document가 이미 생성되었는지 추적
- * 현재 사용되지 않음 (URL 직접 전달 방식으로 변경)
- */
-// let offscreenDocumentCreated = false;
-
-/**
- * Offscreen document를 생성하거나 이미 존재하는지 확인
- * 현재 사용되지 않음 (URL 직접 전달 방식으로 변경)
- */
-/*
-async function ensureOffscreenDocument(): Promise<void> {
-  if (offscreenDocumentCreated) {
-    return;
-  }
-
-  try {
-    // Offscreen document 생성
-    // 이미 존재하면 에러가 발생하므로 catch에서 처리
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL("src/offscreen/index.html"),
-      reasons: ["BLOBS" as chrome.offscreen.Reason],
-      justification: "CORS 제한 없이 Notion PDF를 가져오기 위해 필요합니다",
-    });
-
-    offscreenDocumentCreated = true;
-    console.log("[Service Worker] Offscreen document created");
-  } catch (error) {
-    // 이미 존재하는 경우 에러를 무시
-    if (
-      error instanceof Error &&
-      error.message.includes("Only a single offscreen")
-    ) {
-      offscreenDocumentCreated = true;
-      console.log("[Service Worker] Offscreen document already exists");
-    } else {
-      throw error;
-    }
-  }
-}
-*/
-
-/**
- * Offscreen document를 통해 PDF를 가져오는 함수
- * 현재 사용되지 않음 (URL 직접 전달 방식으로 변경)
- * @param url PDF 파일 URL
- * @returns Blob URL
- */
-/*
-async function fetchPdfViaOffscreen(url: string): Promise<string> {
-  // Offscreen document가 준비되었는지 확인
-  await ensureOffscreenDocument();
-
-  // Offscreen document에 메시지 전송
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
-      { type: "FETCH_PDF", url },
-      (response: { type: string; blobUrl?: string; error?: string }) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-
-        if (response.type === "FETCH_SUCCESS" && response.blobUrl) {
-          resolve(response.blobUrl);
-        } else if (response.type === "FETCH_ERROR") {
-          reject(new Error(response.error || "Unknown error"));
-        } else {
-          reject(new Error("Invalid response from offscreen document"));
-        }
-      }
-    );
-  });
-}
-*/
 
 /**
  * Content Script로부터 메시지를 수신하는 리스너
@@ -239,31 +163,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 chrome.downloads.onCreated.addListener(
   async (item: chrome.downloads.DownloadItem) => {
-    console.log("[Service Worker] 다운로드 감지됨:", item.url);
+    const timestamp = new Date().toISOString();
+    console.log(`[Service Worker] [${timestamp}] ===== 다운로드 이벤트 #${item.id} =====`);
+    console.log(`[Service Worker] URL: ${item.url}`);
+    console.log(`[Service Worker] Filename: ${item.filename}`);
+    console.log(`[Service Worker] State: ${item.state}`);
+    console.log(`[Service Worker] previewModeEnabled: ${previewModeEnabled}`);
 
     // Preview mode가 아니면 무시
     if (!previewModeEnabled) {
-      console.log("[Service Worker] 미리보기 모드 비활성화됨, 무시");
+      console.log(`[Service Worker] [${timestamp}] 미리보기 모드 비활성화됨, 무시`);
       return;
     }
 
     // Notion export가 아니면 무시
     if (!item.url || !isNotionExport(item.url)) {
-      console.log("[Service Worker] Notion export가 아님, 무시");
+      console.log(`[Service Worker] [${timestamp}] Notion export가 아님, 무시`);
       return;
     }
 
-    console.log(
-      "[Service Worker] 미리보기 모드 활성화됨, 다운로드 가로채는 중..."
-    );
+    console.log(`[Service Worker] [${timestamp}] ✓ 다운로드 가로채기 시작`);
 
     // Preview mode 즉시 비활성화 (1회만 실행)
+    const beforeDisable = Date.now();
     previewModeEnabled = false;
+    console.log(`[Service Worker] [${timestamp}] previewModeEnabled → false (${Date.now() - beforeDisable}ms)`);
 
     try {
       // 디스크 저장 방지를 위해 즉시 다운로드 취소
+      const beforeCancel = Date.now();
+      console.log(`[Service Worker] [${timestamp}] cancel() 호출 중...`);
       await chrome.downloads.cancel(item.id);
-      console.log("[Service Worker] 다운로드 취소됨:", item.id);
+      const cancelDuration = Date.now() - beforeCancel;
+      console.log(`[Service Worker] [${timestamp}] ✓ cancel() 완료 (다운로드 ID: ${item.id}, 소요 시간: ${cancelDuration}ms)`);
 
       // 배율 변경 요청인지 확인
       const isScaleChange = requestedScale !== null;
