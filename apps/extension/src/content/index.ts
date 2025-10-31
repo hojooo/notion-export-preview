@@ -36,101 +36,48 @@ function tryAddPreviewButton(): void {
 }
 
 /**
+ * Export 다이얼로그를 찾는 함수
+ */
+function findExportDialog(): HTMLElement | null {
+  // aria-label="내보내기"를 가진 다이얼로그 찾기
+  const dialog = document.querySelector('[role="dialog"][aria-label="내보내기"]');
+  if (dialog) {
+    return dialog as HTMLElement;
+  }
+
+  // 영어 버전도 확인
+  const dialogEn = document.querySelector('[role="dialog"][aria-label="Export"]');
+  if (dialogEn) {
+    return dialogEn as HTMLElement;
+  }
+
+  return null;
+}
+
+/**
  * Notion의 Export 버튼을 찾는 함수
- * Notion UI는 자주 변경되므로 여러 방법을 시도
+ * 다이얼로그 내부에서만 검색하여 효율성 향상
  */
 function findExportButton(): HTMLElement | null {
-  console.log("[Content Script] Searching for Export button...");
+  // 1. Export 다이얼로그 찾기
+  const dialog = findExportDialog();
+  if (!dialog) {
+    return null;
+  }
 
-  // 1. 모든 버튼을 순회하면서 "Export" 텍스트를 포함하는 버튼 찾기
-  const allButtons = document.querySelectorAll("button");
-  console.log(`[Content Script] Found ${allButtons.length} buttons on page`);
+  // 2. 다이얼로그 내부에서 role="button"인 요소들만 검색
+  const buttons = dialog.querySelectorAll('[role="button"]');
 
-  for (const button of allButtons) {
-    const text = button.textContent?.trim().toLowerCase() || "";
-    const ariaLabel = button.getAttribute("aria-label")?.toLowerCase() || "";
+  // 3. "내보내기" 또는 "Export" 텍스트를 가진 버튼 찾기
+  for (const button of buttons) {
+    const text = button.textContent?.trim() || "";
 
-    if (
-      text === "export" ||
-      text.includes("export") ||
-      ariaLabel.includes("export")
-    ) {
-      console.log("[Content Script] Export button found via button tag:", {
-        text,
-        ariaLabel,
-      });
+    if (text === "내보내기" || text === "Export") {
+      console.log(`[Content Script] Export button found: "${text}"`);
       return button as HTMLElement;
     }
   }
 
-  // 2. div 요소 중에서 role이 button이고 Export 텍스트를 포함하는 것 찾기
-  const divButtons = document.querySelectorAll('div[role="button"]');
-  console.log(
-    `[Content Script] Found ${divButtons.length} div[role="button"] elements`
-  );
-
-  // 디버깅: 모든 div[role="button"]의 텍스트 출력
-  divButtons.forEach((div, index) => {
-    const text = div.textContent?.trim() || "";
-    if (text.length > 0 && text.length < 50) {
-      // 너무 긴 텍스트는 제외
-      console.log(`[Content Script] Button ${index}: "${text}"`);
-    }
-  });
-
-  for (const div of divButtons) {
-    const text = div.textContent?.trim().toLowerCase() || "";
-    const ariaLabel = div.getAttribute("aria-label")?.toLowerCase() || "";
-
-    // Export 또는 내보내기 확인
-    if (
-      text === "export" ||
-      text.includes("export") ||
-      text === "내보내기" ||
-      text.includes("내보내기") ||
-      ariaLabel.includes("export") ||
-      ariaLabel.includes("내보내기")
-    ) {
-      console.log(
-        "[Content Script] Export button found via div[role=button]:",
-        { text, ariaLabel }
-      );
-      return div as HTMLElement;
-    }
-  }
-
-  // 3. 특정 스타일을 가진 요소 중에서 Export 텍스트 찾기
-  const styledElements = document.querySelectorAll(
-    '[style*="cursor: pointer"]'
-  );
-  console.log(
-    `[Content Script] Found ${styledElements.length} elements with cursor: pointer`
-  );
-
-  for (const element of styledElements) {
-    const text = element.textContent?.trim().toLowerCase() || "";
-    if (text === "export" || text.includes("export")) {
-      console.log("[Content Script] Export button found via style:", { text });
-      return element as HTMLElement;
-    }
-  }
-
-  // 4. Shadow DOM 확인
-  const allElements = document.querySelectorAll("*");
-  for (const element of allElements) {
-    if (element.shadowRoot) {
-      const shadowButtons = element.shadowRoot.querySelectorAll("button");
-      for (const button of shadowButtons) {
-        const text = button.textContent?.trim().toLowerCase() || "";
-        if (text === "export" || text.includes("export")) {
-          console.log("[Content Script] Export button found in shadow DOM");
-          return button as HTMLElement;
-        }
-      }
-    }
-  }
-
-  console.log("[Content Script] Export button not found");
   return null;
 }
 
@@ -203,10 +150,10 @@ function createPreviewButton(): HTMLButtonElement {
         // 사용자가 명시적으로 Export를 클릭하도록 하려면 이 부분 제거
         const exportButton = findExportButton();
         if (exportButton) {
-          // 약간의 지연 후 클릭
+
           setTimeout(() => {
             exportButton.click();
-          }, 500);
+          }, 10);
         }
       }
     } catch (error) {
@@ -229,12 +176,37 @@ function createPreviewButton(): HTMLButtonElement {
 
 /**
  * MutationObserver로 DOM 변화를 감지
- * Export 다이얼로그가 나타날 때 버튼 추가
+ * Export 다이얼로그가 실제로 추가됐을 때만 버튼 추가
  */
 function observeDomChanges(): void {
-  const observer = new MutationObserver(() => {
-    // DOM에 변화가 있을 때마다 Export 버튼을 찾아 Preview 버튼 추가 시도
-    tryAddPreviewButton();
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      // 추가된 노드들만 확인
+      for (const node of mutation.addedNodes) {
+        if (node instanceof HTMLElement) {
+          // 1. 추가된 노드 자체가 Export 다이얼로그인지 확인
+          if (
+            node.matches('[role="dialog"][aria-label="내보내기"]') ||
+            node.matches('[role="dialog"][aria-label="Export"]')
+          ) {
+            console.log("[Content Script] Export dialog detected (direct)");
+            tryAddPreviewButton();
+            return;
+          }
+
+          // 2. 추가된 노드의 하위에 Export 다이얼로그가 있는지 확인
+          const dialog =
+            node.querySelector('[role="dialog"][aria-label="내보내기"]') ||
+            node.querySelector('[role="dialog"][aria-label="Export"]');
+
+          if (dialog) {
+            console.log("[Content Script] Export dialog detected (in subtree)");
+            tryAddPreviewButton();
+            return;
+          }
+        }
+      }
+    }
   });
 
   // body 전체를 관찰
@@ -291,6 +263,140 @@ function init(): void {
   observeDomChanges();
   observeDialogClose();
 }
+
+/**
+ * Notion의 배율 입력 필드를 찾는 함수
+ * 다이얼로그 내부에서만 검색하여 효율성 향상
+ */
+function findScaleInput(): HTMLInputElement | null {
+  // 1. Export 다이얼로그 찾기
+  const dialog = findExportDialog();
+  if (!dialog) {
+    console.log("[Content Script] Export dialog not found, cannot find scale input");
+    return null;
+  }
+
+  // 2. 다이얼로그 내부의 input[type=text] 요소들만 검색
+  const inputs = dialog.querySelectorAll('input[type=text]');
+  console.log(`[Content Script] Found ${inputs.length} text inputs in dialog`);
+
+  // 3. text-align: end 스타일을 가진 입력 필드 찾기 (배율 필드)
+  for (const input of inputs) {
+    const style = window.getComputedStyle(input as HTMLElement);
+    if (style.textAlign === 'end' || style.textAlign === 'right') {
+      // 값이 숫자인지 확인 (배율 필드일 가능성)
+      const value = (input as HTMLInputElement).value;
+      if (value && !isNaN(parseInt(value))) {
+        console.log(`[Content Script] Scale input found with value: ${value}`);
+        return input as HTMLInputElement;
+      }
+    }
+  }
+
+  console.log("[Content Script] Scale input not found in dialog");
+  return null;
+}
+
+/**
+ * Notion의 배율을 변경하는 함수
+ */
+function setNotionScale(scale: number): boolean {
+  console.log(`[Content Script] setNotionScale called with scale: ${scale}%`);
+
+  const input = findScaleInput();
+
+  if (!input) {
+    console.error("[Content Script] Scale input not found - Export dialog may be closed");
+    return false;
+  }
+
+  console.log("[Content Script] Scale input found:", {
+    currentValue: input.value,
+    targetValue: scale.toString()
+  });
+
+  try {
+    // 포커스
+    input.focus();
+    console.log("[Content Script] Input focused");
+
+    // React 값 변경
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(input, scale.toString());
+      console.log("[Content Script] Native setter called");
+    }
+
+    // 이벤트 발생
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    console.log("[Content Script] Events dispatched (input, change)");
+
+    // Blur
+    input.blur();
+    console.log("[Content Script] Input blurred");
+
+    console.log(`[Content Script] ✓ Scale successfully changed to ${scale}%`);
+    return true;
+  } catch (error) {
+    console.error("[Content Script] ✗ Failed to set scale:", error);
+    return false;
+  }
+}
+
+/**
+ * Service Worker로부터 메시지 수신
+ */
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  console.log("[Content Script] ===== Message received:", message.type, "=====");
+
+  if (message.type === "CHANGE_SCALE") {
+    const { scale } = message;
+    console.log(`[Content Script] Scale change requested: ${scale}%`);
+
+    // 배율 변경
+    console.log("[Content Script] Step 1: Attempting to change scale...");
+    const success = setNotionScale(scale);
+    console.log(`[Content Script] Step 1 Result: ${success ? "SUCCESS" : "FAILED"}`);
+
+    if (success) {
+      // Preview mode 활성화
+      console.log("[Content Script] Step 2: Enabling preview mode...");
+      chrome.runtime.sendMessage({ type: "ENABLE_PREVIEW_MODE" }, (response) => {
+        console.log("[Content Script] Step 2 Result:", response);
+      });
+
+      // 약간의 지연 후 Export 버튼 클릭
+      console.log("[Content Script] Step 3: Waiting 500ms before clicking Export button...");
+      setTimeout(() => {
+        console.log("[Content Script] Step 3: Searching for Export button...");
+        const exportButton = findExportButton();
+
+        if (exportButton) {
+          console.log("[Content Script] Step 3: Export button FOUND, attempting to click...");
+          exportButton.click();
+          console.log("[Content Script] Step 3 Result: Export button clicked successfully");
+          sendResponse({ success: true });
+        } else {
+          console.error("[Content Script] Step 3 Result: Export button NOT FOUND");
+          sendResponse({ success: false, error: "Export button not found" });
+        }
+      }, 500);
+
+      return true; // 비동기 응답
+    } else {
+      console.error("[Content Script] Failed at Step 1: Could not change scale");
+      sendResponse({ success: false, error: "Failed to change scale" });
+      return false;
+    }
+  }
+
+  return false;
+});
 
 // DOM이 준비되면 초기화
 if (document.readyState === "loading") {
