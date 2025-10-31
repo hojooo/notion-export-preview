@@ -4,12 +4,12 @@
 
 /**
  * Notion 내보내기로 허용되는 호스트 패턴 목록
- * - notion.so: Notion 메인 도메인
+ * - notion.so: Notion 메인 도메인 (www, file 등 모든 서브도메인 포함)
  * - amazonaws.com: S3 저장소 도메인 (실제 PDF 파일 위치)
  */
 const ALLOWED_PATTERNS = [
-  /https:\/\/(www\.)?notion\.so\//,
-  /https:\/\/.*\.amazonaws\.com\//,
+  /https:\/\/(.*\.)?notion\.so\//,  // file.notion.so, www.notion.so, notion.so 모두 매칭
+  // /https:\/\/.*\.amazonaws\.com\//,
 ];
 
 /**

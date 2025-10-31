@@ -51,9 +51,61 @@ body {
 }
 
 #filename {
-  margin-left: auto;
   font-size: 13px;
   opacity: 0.9;
+}
+
+#scale-control {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+#scale-slider {
+  width: 150px;
+  height: 4px;
+  border-radius: 2px;
+  background: #474b4f;
+  outline: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+#scale-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2383E2;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#scale-slider::-webkit-slider-thumb:hover {
+  background: #1F7ADB;
+}
+
+#scale-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2383E2;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+
+#scale-slider::-moz-range-thumb:hover {
+  background: #1F7ADB;
+}
+
+#scale-status {
+  font-size: 12px;
+  opacity: 0.7;
+  min-width: 80px;
 }
 
 #pdf-viewer {

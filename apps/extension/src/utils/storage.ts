@@ -41,3 +41,6 @@ export async function saveSettings(settings: Partial<ExtensionSettings>): Promis
 export async function resetSettings(): Promise<void> {
   await chrome.storage.local.set(DEFAULT_SETTINGS);
 }
+
+
+// 매번 모든 버튼을 찾는거 너무 비효율적
