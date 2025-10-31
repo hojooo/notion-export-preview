@@ -126,31 +126,24 @@ function createPreviewButton(): HTMLButtonElement {
 
     console.log("[Content Script] Preview button clicked");
 
-    // Service Worker에 preview mode 활성화 메시지 전송
+    // 현재 설정된 배율 읽기
+    const scaleInput = findScaleInput();
+    const currentScale = scaleInput ? parseInt(scaleInput.value) : 100;
+    console.log(`[Content Script] Current scale: ${currentScale}%`);
+
+    // Service Worker에 preview mode 활성화 메시지 전송 (배율 정보 포함)
     try {
       const response = await chrome.runtime.sendMessage({
         type: "ENABLE_PREVIEW_MODE",
+        scale: currentScale,
       });
 
       if (response?.success) {
         console.log("[Content Script] Preview mode enabled");
 
-        // button.textContent = "미리보기 모드 활성화 ✓";
-        // button.style.background = "#0F7B6C";
-        // button.style.color = "white";
-
-        // // 2초 후 원래대로 복원
-        // setTimeout(() => {
-        //   button.textContent = "미리보기";
-        //   button.style.background = "#2383E2";
-        //   button.style.color = "white";
-        // }, 2000);
-
-        // Export 버튼을 자동으로 클릭 (선택사항)
-        // 사용자가 명시적으로 Export를 클릭하도록 하려면 이 부분 제거
+        // Export 버튼을 자동으로 클릭
         const exportButton = findExportButton();
         if (exportButton) {
-
           setTimeout(() => {
             exportButton.click();
           }, 10);

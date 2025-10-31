@@ -22,6 +22,11 @@ let notionTabId: number | null = null;
 let requestedScale: number | null = null;
 
 /**
+ * 초기 배율 (미리보기 버튼 클릭 시 설정된 배율)
+ */
+let initialScale: number = 100;
+
+/**
  * Viewer Tab ID 저장 (PDF URL 전달용)
  */
 let viewerTabId: number | null = null;
@@ -117,6 +122,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       notionTabId = sender.tab.id;
       console.log("[Service Worker] Notion Tab ID saved:", notionTabId);
     }
+
+    // 초기 배율 저장
+    initialScale = message.scale || 100;
+    console.log(`[Service Worker] Initial scale saved: ${initialScale}%`);
 
     console.log("[Service Worker] Preview mode enabled");
 
@@ -223,11 +232,12 @@ chrome.downloads.onCreated.addListener(
         const viewerUrl = chrome.runtime.getURL("src/viewer/index.html");
         const filename = item.filename || "export.pdf";
         const tabIdParam = notionTabId ? `&tabId=${notionTabId}` : "";
-        const fullUrl = `${viewerUrl}?src=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(filename)}${tabIdParam}`;
+        const scaleParam = `&scale=${initialScale}`;
+        const fullUrl = `${viewerUrl}?src=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(filename)}${tabIdParam}${scaleParam}`;
 
         const tab = await chrome.tabs.create({ url: fullUrl });
         viewerTabId = tab.id || null;
-        console.log("[Service Worker] Viewer tab opened with direct URL");
+        console.log(`[Service Worker] Viewer tab opened with scale: ${initialScale}%`);
       }
 
       // 성공 badge 표시

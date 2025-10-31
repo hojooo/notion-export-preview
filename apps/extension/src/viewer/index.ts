@@ -14,12 +14,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(
 );
 
 /**
- * URL 파라미터에서 PDF 소스와 파일명 추출
+ * URL 파라미터에서 PDF 소스와 파일명, 배율 추출
  */
 const urlParams = new URLSearchParams(window.location.search);
 const pdfSrc = urlParams.get("src");
 const filename = urlParams.get("filename") || "export.pdf";
 const notionTabId = parseInt(urlParams.get("tabId") || "0");
+const initialScale = parseInt(urlParams.get("scale") || "100");
 
 /**
  * 파일명을 UI에 표시
@@ -33,11 +34,12 @@ if (filenameElement) {
  * 배율별 PDF URL 캐시
  */
 const pdfCache = new Map<number, string>();
-let currentScale = 100;
+let currentScale = initialScale;
 
 // 초기 PDF를 캐시에 저장
 if (pdfSrc) {
-  pdfCache.set(100, pdfSrc);
+  pdfCache.set(initialScale, pdfSrc);
+  console.log(`[Viewer] Initial scale: ${initialScale}%`);
 }
 
 /**
@@ -173,6 +175,11 @@ const scaleSlider = document.getElementById("scale-slider") as HTMLInputElement;
 const scaleValueElement = document.getElementById("scale-value");
 
 if (scaleSlider && scaleValueElement) {
+  // 슬라이더 초기값 설정
+  scaleSlider.value = initialScale.toString();
+  scaleValueElement.textContent = initialScale.toString();
+  console.log(`[Viewer] Slider initialized to ${initialScale}%`);
+
   // 슬라이더 값 변경 시 표시 업데이트
   scaleSlider.addEventListener("input", (e) => {
     const value = (e.target as HTMLInputElement).value;
