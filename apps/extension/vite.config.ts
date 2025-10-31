@@ -13,7 +13,7 @@ export default defineConfig({
         description: pkg.description,
         version: pkg.version,
         manifest_version: 3,
-        permissions: ["downloads", "scripting", "activeTab", "storage", "offscreen"],
+        permissions: ["downloads", "scripting", "activeTab", "storage", "offscreen", "cookies"],
         host_permissions: [
           "https://www.notion.so/*",
           "https://*.amazonaws.com/*",
@@ -47,6 +47,13 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,      // console.log/info/warn 제거
+        drop_debugger: true,     // debugger 구문 제거
+      }
+    },
     rollupOptions: {
       output: {
         entryFileNames: "[name].js",

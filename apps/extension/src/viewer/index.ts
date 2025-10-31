@@ -39,7 +39,7 @@ let currentScale = initialScale;
 // 초기 PDF를 캐시에 저장
 if (pdfSrc) {
   pdfCache.set(initialScale, pdfSrc);
-  console.log(`[Viewer] Initial scale: ${initialScale}%`);
+  console.log(`[Viewer] 초기 배율: ${initialScale}%`);
 }
 
 /**
@@ -48,7 +48,7 @@ if (pdfSrc) {
  */
 async function renderPDF(url: string = pdfSrc || "") {
   if (!url) {
-    console.error("No PDF source provided");
+    console.error("PDF 소스가 제공되지 않았습니다");
     return;
   }
 
@@ -62,7 +62,7 @@ async function renderPDF(url: string = pdfSrc || "") {
     const loadingTask = pdfjsLib.getDocument(url);
     const pdf = await loadingTask.promise;
 
-    console.log("PDF loaded, pages:", pdf.numPages);
+    console.log("PDF 로드 완료, 페이지 수:", pdf.numPages);
 
     // 모든 페이지 렌더링
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -87,8 +87,8 @@ async function renderPDF(url: string = pdfSrc || "") {
       container.appendChild(canvas);
     }
   } catch (error) {
-    console.error("Error rendering PDF:", error);
-    alert("Failed to load PDF preview. Please try downloading the original file.");
+    console.error("PDF 렌더링 오류:", error);
+    alert("PDF 미리보기 로드 실패. 원본 파일을 다운로드해주세요.");
   }
 }
 
@@ -106,22 +106,6 @@ document.getElementById("save-btn")?.addEventListener("click", () => {
   });
 });
 
-/**
- * 인쇄 버튼 클릭 핸들러
- */
-document.getElementById("print-btn")?.addEventListener("click", () => {
-  window.print();
-});
-
-/**
- * 원본 다운로드 버튼 클릭 핸들러
- * TODO: 원본 URL 저장 기능 구현 필요
- */
-document.getElementById("download-original-btn")?.addEventListener("click", () => {
-  // 원본 URL 저장 기능이 필요함
-  // 현재는 안내 메시지만 표시
-  alert("Original download feature coming soon!");
-});
 
 /**
  * 배율 변경 요청 함수
@@ -131,7 +115,7 @@ async function requestScaleChange(scale: number) {
 
   // 이미 캐시에 있으면 즉시 표시
   if (pdfCache.has(scale)) {
-    if (statusElement) statusElement.textContent = "Cached";
+    if (statusElement) statusElement.textContent = "Cached ✓";
     const url = pdfCache.get(scale)!;
     await renderPDF(url);
     if (statusElement) {
@@ -143,7 +127,7 @@ async function requestScaleChange(scale: number) {
   }
 
   // 캐시에 없으면 생성 요청
-  if (statusElement) statusElement.textContent = "Generating...";
+  if (statusElement) statusElement.textContent = "PDF 렌더링 요청 중";
 
   try {
     // Service Worker에 배율 변경 요청
@@ -154,41 +138,71 @@ async function requestScaleChange(scale: number) {
     });
 
     if (response?.success) {
-      // 다운로드가 시작되면 대기
-      console.log("[Viewer] Scale change requested successfully");
+      // Private API 성공
+      console.log("[Viewer] Private API 방식 사용 중");
+      if (statusElement) statusElement.textContent = "PDF 렌더링 중..";
     } else {
-      throw new Error(response?.error || "Failed to request scale change");
+      // Private API 실패
+      const errorMsg = response?.error || "배율 변경 요청 실패";
+      throw new Error(errorMsg);
     }
   } catch (error) {
-    console.error("[Viewer] Failed to request scale change:", error);
-    if (statusElement) statusElement.textContent = "Error";
-    setTimeout(() => {
-      if (statusElement) statusElement.textContent = "";
-    }, 3000);
+    console.error("[Viewer] 배율 변경 요청 실패:", error);
+    const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
+
+    // 사용자에게 에러 메시지 표시
+    if (statusElement) {
+      statusElement.textContent = `❌ ${errorMessage}`;
+      statusElement.style.color = "#dc3545";
+
+      // 5초 후 원래대로 복원
+      setTimeout(() => {
+        if (statusElement) {
+          statusElement.textContent = "";
+          statusElement.style.color = "";
+        }
+      }, 5000);
+    }
   }
 }
 
 /**
- * 슬라이더 이벤트 리스너
+ * 배율 입력 필드 이벤트 리스너
  */
 const scaleSlider = document.getElementById("scale-slider") as HTMLInputElement;
 const scaleValueElement = document.getElementById("scale-value");
 
 if (scaleSlider && scaleValueElement) {
-  // 슬라이더 초기값 설정
+  // 입력 필드 초기값 설정
   scaleSlider.value = initialScale.toString();
   scaleValueElement.textContent = initialScale.toString();
-  console.log(`[Viewer] Slider initialized to ${initialScale}%`);
+  console.log(`[Viewer] 배율 입력 필드 초기값: ${initialScale}%`);
 
-  // 슬라이더 값 변경 시 표시 업데이트
+  // 입력 값 변경 시 실시간 표시 업데이트
   scaleSlider.addEventListener("input", (e) => {
     const value = (e.target as HTMLInputElement).value;
     scaleValueElement.textContent = value;
   });
 
-  // 슬라이더 드래그 종료 시 배율 변경 요청
+  // Enter 키 또는 포커스 아웃 시 배율 변경 요청
   scaleSlider.addEventListener("change", async (e) => {
-    const value = parseInt((e.target as HTMLInputElement).value);
+    let value = parseInt((e.target as HTMLInputElement).value);
+
+    // 범위 검증 (10~200)
+    if (isNaN(value)) {
+      value = currentScale; // 잘못된 입력이면 현재 값 유지
+    } else if (value < 10) {
+      value = 10;
+      console.log("[Viewer] 배율이 최소값으로 조정됨: 10%");
+    } else if (value > 200) {
+      value = 200;
+      console.log("[Viewer] 배율이 최대값으로 조정됨: 200%");
+    }
+
+    // 입력 필드 값 보정
+    scaleSlider.value = value.toString();
+    scaleValueElement.textContent = value.toString();
+
     if (value !== currentScale) {
       currentScale = value;
       await requestScaleChange(value);
@@ -199,10 +213,10 @@ if (scaleSlider && scaleValueElement) {
 /**
  * Service Worker로부터 새로운 PDF URL 수신
  */
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "NEW_SCALE_PDF") {
     const { scale, url } = message;
-    console.log(`[Viewer] Received PDF for scale ${scale}%`);
+    console.log(`[Viewer] 배율 ${scale}% PDF 수신됨`);
 
     // 캐시에 저장
     pdfCache.set(scale, url);

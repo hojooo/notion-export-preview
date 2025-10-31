@@ -4,6 +4,7 @@
  */
 
 import { isNotionExport } from "../utils/urlFilter";
+import { exportPageWithScale } from "../utils/notionPrivateApi";
 
 /**
  * Preview mode 플래그
@@ -111,7 +112,7 @@ async function fetchPdfViaOffscreen(url: string): Promise<string> {
  * Content Script로부터 메시지를 수신하는 리스너
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("[Service Worker] Message received:", message.type);
+  console.log("[Service Worker] 메시지 수신:", message.type);
 
   if (message.type === "ENABLE_PREVIEW_MODE") {
     // Preview mode 활성화
@@ -120,14 +121,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Notion Tab ID 저장 (Content Script에서 보낸 경우)
     if (sender.tab?.id) {
       notionTabId = sender.tab.id;
-      console.log("[Service Worker] Notion Tab ID saved:", notionTabId);
+      console.log("[Service Worker] Notion 탭 ID 저장됨:", notionTabId);
     }
 
     // 초기 배율 저장
     initialScale = message.scale || 100;
-    console.log(`[Service Worker] Initial scale saved: ${initialScale}%`);
+    console.log(`[Service Worker] 초기 배율 저장됨: ${initialScale}%`);
 
-    console.log("[Service Worker] Preview mode enabled");
+    console.log("[Service Worker] 미리보기 모드 활성화됨");
 
     // Content Script에 성공 응답
     sendResponse({ success: true });
@@ -139,41 +140,92 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Viewer에서 배율 변경 요청
     const { scale, notionTabId: tabId } = message;
 
-    console.log(`[Service Worker] ===== REQUEST_SCALE_CHANGE received =====`);
-    console.log(`[Service Worker] Scale: ${scale}%`);
-    console.log(`[Service Worker] Notion Tab ID: ${tabId}`);
+    console.log(`[Service Worker] ===== REQUEST_SCALE_CHANGE 수신 =====`);
+    console.log(`[Service Worker] 배율: ${scale}%`);
+    console.log(`[Service Worker] Notion 탭 ID: ${tabId}`);
 
     // Viewer Tab ID 저장
     if (sender.tab?.id) {
       viewerTabId = sender.tab.id;
-      console.log(`[Service Worker] Viewer Tab ID saved: ${viewerTabId}`);
+      console.log(`[Service Worker] 뷰어 탭 ID 저장됨: ${viewerTabId}`);
     }
 
     requestedScale = scale;
-    console.log(`[Service Worker] Requested scale stored: ${requestedScale}%`);
+    console.log(`[Service Worker] 요청된 배율 저장됨: ${requestedScale}%`);
 
-    // Content Script에 배율 변경 요청 전달
+    // Private API 방식으로 시도
     if (tabId) {
-      console.log(`[Service Worker] Sending CHANGE_SCALE message to Content Script (tab ${tabId})...`);
+      console.log(`[Service Worker] Private API 방식 시도 중...`);
 
-      chrome.tabs.sendMessage(
-        tabId,
-        { type: "CHANGE_SCALE", scale: scale },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("[Service Worker] ✗ Failed to send message to Content Script:", chrome.runtime.lastError);
-            sendResponse({ success: false, error: chrome.runtime.lastError.message });
-          } else {
-            console.log("[Service Worker] ✓ Message sent successfully to Content Script");
-            console.log("[Service Worker] Content Script response:", response);
-            sendResponse({ success: true });
+      // 비동기 처리
+      (async () => {
+        try {
+          // 1. Content Script에서 Notion 컨텍스트 가져오기
+          console.log(`[Service Worker] 탭 ${tabId}에서 Notion 컨텍스트 요청 중...`);
+          const contextResponse = await chrome.tabs.sendMessage(tabId, {
+            type: "GET_NOTION_CONTEXT",
+          });
+
+          if (!contextResponse?.success) {
+            throw new Error(contextResponse?.error || "Notion 컨텍스트를 가져오지 못했습니다");
           }
+
+          const { pageId } = contextResponse.context;
+          console.log(`[Service Worker] ✓ pageId 획득 완료: ${pageId}`);
+
+          // 2. chrome.cookies API로 token_v2 획득 (HttpOnly 쿠키 접근)
+          console.log(`[Service Worker] 쿠키에서 token_v2 가져오는 중...`);
+          const cookie = await chrome.cookies.get({
+            url: "https://www.notion.so",
+            name: "token_v2",
+          });
+
+          if (!cookie || !cookie.value) {
+            throw new Error("토큰을 찾을 수 없습니다. Notion에 로그인해주세요.");
+          }
+
+          const token = cookie.value;
+          console.log(`[Service Worker] ✓ token_v2 획득 완료`);
+
+          // 3. Private API로 Export 생성 (scale을 0.1~2.0 범위로 변환)
+          console.log(`[Service Worker] Private API 호출 중, 배율: ${scale / 100}...`);
+          const exportURL = await exportPageWithScale({
+            pageId,
+            scale: scale / 100, // 55 → 0.55
+            token,
+          });
+
+          console.log(`[Service Worker] ✓ Private API 성공: ${exportURL}`);
+
+          // 3. Viewer에 URL 전달
+          if (viewerTabId) {
+            chrome.tabs.sendMessage(viewerTabId, {
+              type: "NEW_SCALE_PDF",
+              scale: scale,
+              url: exportURL,
+            });
+          }
+
+          sendResponse({ success: true, method: "private-api" });
+        } catch (error) {
+          // Private API 실패 - 사용자에게 에러 알림
+          console.error(
+            "[Service Worker] ✗ Private API 실패:",
+            error
+          );
+
+          const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
+          sendResponse({
+            success: false,
+            error: errorMessage,
+          });
         }
-      );
+      })();
+
       return true; // 비동기 응답
     } else {
-      console.error("[Service Worker] ✗ No Notion tab ID provided");
-      sendResponse({ success: false, error: "Notion tab ID not found" });
+      console.error("[Service Worker] ✗ Notion 탭 ID가 제공되지 않음");
+      sendResponse({ success: false, error: "Notion 탭 ID를 찾을 수 없습니다" });
       return false;
     }
   }
@@ -187,22 +239,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 chrome.downloads.onCreated.addListener(
   async (item: chrome.downloads.DownloadItem) => {
-    console.log("[Service Worker] Download detected:", item.url);
+    console.log("[Service Worker] 다운로드 감지됨:", item.url);
 
     // Preview mode가 아니면 무시
     if (!previewModeEnabled) {
-      console.log("[Service Worker] Preview mode disabled, ignoring");
+      console.log("[Service Worker] 미리보기 모드 비활성화됨, 무시");
       return;
     }
 
     // Notion export가 아니면 무시
     if (!item.url || !isNotionExport(item.url)) {
-      console.log("[Service Worker] Not a Notion export, ignoring");
+      console.log("[Service Worker] Notion export가 아님, 무시");
       return;
     }
 
     console.log(
-      "[Service Worker] Preview mode active, intercepting download..."
+      "[Service Worker] 미리보기 모드 활성화됨, 다운로드 가로채는 중..."
     );
 
     // Preview mode 즉시 비활성화 (1회만 실행)
@@ -211,14 +263,14 @@ chrome.downloads.onCreated.addListener(
     try {
       // 디스크 저장 방지를 위해 즉시 다운로드 취소
       await chrome.downloads.cancel(item.id);
-      console.log("[Service Worker] Download canceled:", item.id);
+      console.log("[Service Worker] 다운로드 취소됨:", item.id);
 
       // 배율 변경 요청인지 확인
       const isScaleChange = requestedScale !== null;
 
       if (isScaleChange && viewerTabId) {
         // 배율 변경 요청인 경우: 기존 Viewer에 메시지 전송
-        console.log(`[Service Worker] Sending PDF URL to Viewer (scale: ${requestedScale}%)`);
+        console.log(`[Service Worker] 뷰어로 PDF URL 전송 중 (배율: ${requestedScale}%)`);
 
         chrome.tabs.sendMessage(viewerTabId, {
           type: "NEW_SCALE_PDF",
@@ -237,7 +289,7 @@ chrome.downloads.onCreated.addListener(
 
         const tab = await chrome.tabs.create({ url: fullUrl });
         viewerTabId = tab.id || null;
-        console.log(`[Service Worker] Viewer tab opened with scale: ${initialScale}%`);
+        console.log(`[Service Worker] 뷰어 탭 열림, 배율: ${initialScale}%`);
       }
 
       // 성공 badge 표시
@@ -249,7 +301,7 @@ chrome.downloads.onCreated.addListener(
         await chrome.action.setBadgeText({ text: "" });
       }, 3000);
     } catch (error) {
-      console.error("[Service Worker] Failed to preview PDF:", error);
+      console.error("[Service Worker] PDF 미리보기 실패:", error);
 
       // 에러 badge 표시
       await chrome.action.setBadgeText({ text: "!" });
@@ -263,7 +315,7 @@ chrome.downloads.onCreated.addListener(
       // Fallback 없음: 사용자에게 알림만 표시
       // 다운로드를 재시작하지 않음 (무한 루프 방지)
       console.warn(
-        "[Service Worker] Preview failed. Please try downloading normally."
+        "[Service Worker] 미리보기 실패. 일반 다운로드를 시도해주세요."
       );
     }
   }
@@ -273,7 +325,7 @@ chrome.downloads.onCreated.addListener(
  * 확장 프로그램 설치/업데이트 이벤트 처리
  */
 chrome.runtime.onInstalled.addListener((details) => {
-  console.log("[Service Worker] Extension installed/updated:", details.reason);
+  console.log("[Service Worker] 확장 프로그램 설치/업데이트됨:", details.reason);
 });
 
-console.log("[Service Worker] Initialized");
+console.log("[Service Worker] 초기화 완료");
