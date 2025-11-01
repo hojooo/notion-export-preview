@@ -197,6 +197,13 @@ chrome.downloads.onCreated.addListener(
       const cancelDuration = Date.now() - beforeCancel;
       console.log(`[Service Worker] [${timestamp}] ✓ cancel() 완료 (다운로드 ID: ${item.id}, 소요 시간: ${cancelDuration}ms)`);
 
+      // 다운로드 UI에서 제거
+      const beforeErase = Date.now();
+      console.log(`[Service Worker] [${timestamp}] erase() 호출 중...`);
+      await chrome.downloads.erase({ id: item.id });
+      const eraseDuration = Date.now() - beforeErase;
+      console.log(`[Service Worker] [${timestamp}] ✓ erase() 완료 (소요 시간: ${eraseDuration}ms)`);
+
       // 배율 변경 요청인지 확인
       const isScaleChange = requestedScale !== null;
 
