@@ -150,6 +150,21 @@ function createPreviewButton(): HTMLButtonElement {
 
     console.log("[Content Script] Preview 버튼 클릭됨");
 
+    // Extension context 유효성 검사
+    if (!chrome.runtime?.id) {
+      console.error("[Content Script] Extension context가 무효화됨 - 페이지 새로고침 필요");
+      button.textContent = "새로고침 필요 ⟳";
+      button.style.background = "#F4A261";
+      button.style.color = "white";
+
+      setTimeout(() => {
+        button.textContent = "미리보기";
+        button.style.background = "rgb(159, 96, 240)";
+        button.style.color = "white";
+      }, 4000);
+      return;
+    }
+
     // 현재 설정된 배율 읽기
     const scaleInput = findScaleInput();
     const currentScale = scaleInput ? parseInt(scaleInput.value) : 100;
@@ -173,16 +188,30 @@ function createPreviewButton(): HTMLButtonElement {
       }
     } catch (error) {
       console.error("[Content Script] 미리보기 모드 활성화 실패:", error);
-      button.textContent = "오류 발생 ✗";
-      button.style.background = "#EB5757";
-      button.style.color = "white";
 
-      // 3초 후 원래대로 복원
-      setTimeout(() => {
-        button.textContent = "미리보기";
-        button.style.background = "#2383E2";
+      // Extension context invalidated 에러 처리
+      if (error instanceof Error && error.message.includes("Extension context invalidated")) {
+        button.textContent = "새로고침 필요 ⟳";
+        button.style.background = "#F4A261";
         button.style.color = "white";
-      }, 3000);
+
+        setTimeout(() => {
+          button.textContent = "미리보기";
+          button.style.background = "rgb(159, 96, 240)";
+          button.style.color = "white";
+        }, 4000);
+      } else {
+        // 기타 에러
+        button.textContent = "오류 발생 ✗";
+        button.style.background = "#EB5757";
+        button.style.color = "white";
+
+        setTimeout(() => {
+          button.textContent = "미리보기";
+          button.style.background = "rgb(159, 96, 240)";
+          button.style.color = "white";
+        }, 3000);
+      }
     }
   });
 
@@ -414,11 +443,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     console.log(`[Content Script] 1단계 결과: ${success ? "성공" : "실패"}`);
 
     if (success) {
+      // Extension context 유효성 검사
+      if (!chrome.runtime?.id) {
+        console.error("[Content Script] Extension context가 무효화됨 - 페이지 새로고침 필요");
+        sendResponse({ success: false, error: "Extension context가 무효화되었습니다. 페이지를 새로고침해주세요." });
+        return false;
+      }
+
       // Preview mode 활성화
       console.log("[Content Script] 2단계: 미리보기 모드 활성화 중...");
-      chrome.runtime.sendMessage({ type: "ENABLE_PREVIEW_MODE" }, (response) => {
-        console.log("[Content Script] 2단계 결과:", response);
-      });
+      try {
+        chrome.runtime.sendMessage({ type: "ENABLE_PREVIEW_MODE" }, (response) => {
+          console.log("[Content Script] 2단계 결과:", response);
+        });
+      } catch (error) {
+        console.error("[Content Script] 2단계 실패:", error);
+        sendResponse({ success: false, error: "미리보기 모드 활성화에 실패했습니다. 페이지를 새로고침해주세요." });
+        return false;
+      }
 
       // 약간의 지연 후 Export 버튼 클릭
       console.log("[Content Script] 3단계: Export 버튼 클릭 전 500ms 대기 중...");
