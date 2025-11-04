@@ -13,10 +13,9 @@ export default defineConfig({
         description: pkg.description,
         version: pkg.version,
         manifest_version: 3,
-        permissions: ["downloads", "scripting", "activeTab", "storage", "offscreen"],
+        permissions: ["downloads", "scripting", "activeTab", "storage", "offscreen", "cookies"],
         host_permissions: [
-          "https://www.notion.so/*",
-          "https://*.amazonaws.com/*",
+          "https://www.notion.so/*"
         ],
         background: {
           service_worker: "src/background/serviceWorker.ts",
@@ -47,6 +46,13 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: false,     // 개발 모드: console.log 유지
+        drop_debugger: true,     // debugger 구문 제거
+      }
+    },
     rollupOptions: {
       output: {
         entryFileNames: "[name].js",
