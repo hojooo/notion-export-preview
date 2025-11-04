@@ -97,26 +97,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const { pageId } = contextResponse.context;
           console.log(`[Service Worker] ✓ pageId 획득 완료: ${pageId}`);
 
-          // 2. chrome.cookies API로 token_v2 획득 (HttpOnly 쿠키 접근)
-          console.log(`[Service Worker] 쿠키에서 token_v2 가져오는 중...`);
+          // 2. 로그인 여부 확인 (쿠키 존재 확인)
+          console.log(`[Service Worker] 쿠키 존재 여부 확인 중...`);
           const cookie = await chrome.cookies.get({
             url: "https://www.notion.so",
             name: "token_v2",
           });
 
           if (!cookie || !cookie.value) {
-            throw new Error("토큰을 찾을 수 없습니다. Notion에 로그인해주세요.");
+            throw new Error("Notion 로그인 상태가 아닙니다. 로그인 후 다시 시도해주세요.");
           }
-
-          const token = cookie.value;
-          console.log(`[Service Worker] ✓ token_v2 획득 완료`);
+          console.log(`[Service Worker] ✓ 로그인 확인 완료`);
 
           // 3. Private API로 Export 생성 (scale을 0.1~2.0 범위로 변환)
           console.log(`[Service Worker] Private API 호출 중, 배율: ${scale / 100}...`);
           const exportURL = await exportPageWithScale({
             pageId,
             scale: scale / 100, // 55 → 0.55
-            token,
           });
 
           console.log(`[Service Worker] ✓ Private API 성공: ${exportURL}`);

@@ -20,17 +20,7 @@ function extractPageIdFromUrl(url: string): string | null {
   return null;
 }
 
-/**
- * 쿠키에서 token_v2 추출 (유틸리티 함수 inline)
- */
-function getTokenV2FromCookie(cookieString: string): string | null {
-  const value = `; ${cookieString}`;
-  const parts = value.split(`; token_v2=`);
-  if (parts.length === 2) {
-    return parts.pop()?.split(";").shift() || null;
-  }
-  return null;
-}
+// 주의: 쿠키 헤더를 직접 다루지 않습니다. 필요한 인증은 브라우저가 처리합니다.
 
 /**
  * Export 다이얼로그를 감지하고 Preview 버튼을 추가하는 함수
@@ -433,59 +423,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false; // 동기 응답
   }
 
-  if (message.type === "CHANGE_SCALE") {
-    const { scale } = message;
-    console.log(`[Content Script] 배율 변경 요청: ${scale}%`);
-
-    // 배율 변경
-    console.log("[Content Script] 1단계: 배율 변경 시도 중...");
-    const success = setNotionScale(scale);
-    console.log(`[Content Script] 1단계 결과: ${success ? "성공" : "실패"}`);
-
-    if (success) {
-      // Extension context 유효성 검사
-      if (!chrome.runtime?.id) {
-        console.error("[Content Script] Extension context가 무효화됨 - 페이지 새로고침 필요");
-        sendResponse({ success: false, error: "Extension context가 무효화되었습니다. 페이지를 새로고침해주세요." });
-        return false;
-      }
-
-      // Preview mode 활성화
-      console.log("[Content Script] 2단계: 미리보기 모드 활성화 중...");
-      try {
-        chrome.runtime.sendMessage({ type: "ENABLE_PREVIEW_MODE" }, (response) => {
-          console.log("[Content Script] 2단계 결과:", response);
-        });
-      } catch (error) {
-        console.error("[Content Script] 2단계 실패:", error);
-        sendResponse({ success: false, error: "미리보기 모드 활성화에 실패했습니다. 페이지를 새로고침해주세요." });
-        return false;
-      }
-
-      // 약간의 지연 후 Export 버튼 클릭
-      console.log("[Content Script] 3단계: Export 버튼 클릭 전 500ms 대기 중...");
-      setTimeout(() => {
-        console.log("[Content Script] 3단계: Export 버튼 검색 중...");
-        const exportButton = findExportButton();
-
-        if (exportButton) {
-          console.log("[Content Script] 3단계: Export 버튼 발견, 클릭 시도 중...");
-          exportButton.click();
-          console.log("[Content Script] 3단계 결과: Export 버튼 클릭 완료");
-          sendResponse({ success: true });
-        } else {
-          console.error("[Content Script] 3단계 결과: Export 버튼을 찾을 수 없음");
-          sendResponse({ success: false, error: "Export 버튼을 찾을 수 없습니다" });
-        }
-      }, 500);
-
-      return true; // 비동기 응답
-    } else {
-      console.error("[Content Script] 1단계 실패: 배율 변경 불가");
-      sendResponse({ success: false, error: "배율 변경에 실패했습니다" });
-      return false;
-    }
-  }
+  // CHANGE_SCALE 경로는 현재 사용하지 않으므로 제거되었습니다.
 
   return false;
 });

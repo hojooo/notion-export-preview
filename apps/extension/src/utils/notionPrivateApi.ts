@@ -15,11 +15,7 @@ export interface ExportResult {
 /**
  * Notion 페이지 컨텍스트
  */
-export interface NotionContext {
-  pageId: string;
-  spaceId: string;
-  token: string;
-}
+// Notion 컨텍스트 타입은 필요 시 각 호출부에서 정의/조합합니다.
 
 /**
  * Export 작업 상태
@@ -44,18 +40,7 @@ function generateUUID(): string {
   });
 }
 
-/**
- * 쿠키에서 token_v2 추출
- * Content Script에서 호출됨
- */
-export function getTokenV2FromCookie(cookieString: string): string | null {
-  const value = `; ${cookieString}`;
-  const parts = value.split(`; token_v2=`);
-  if (parts.length === 2) {
-    return parts.pop()?.split(";").shift() || null;
-  }
-  return null;
-}
+// 주의: 수동 Cookie 헤더는 MV3에서 금지됨. fetch의 credentials 옵션으로 인증을 위임합니다.
 
 /**
  * URL에서 Notion 페이지 ID 추출
@@ -77,15 +62,14 @@ export function extractPageId(url: string): string | null {
  * 페이지 정보 조회 (spaceId 획득)
  * POST /api/v3/getRecordValues
  */
+// 페이지 정보 조회 (spaceId 획득)
 export async function getPageInfo(
-  pageId: string,
-  token: string
+  pageId: string
 ): Promise<{ spaceId: string }> {
   const response = await fetch(`${NOTION_API_BASE}/getRecordValues`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Cookie: `token_v2=${token}`,
     },
     credentials: "include",
     body: JSON.stringify({
@@ -131,9 +115,8 @@ export async function enqueueExport(params: {
   pageId: string;
   spaceId: string;
   scale: number;
-  token: string;
 }): Promise<string> {
-  const { pageId, spaceId, scale, token } = params;
+  const { pageId, spaceId, scale } = params;
 
   // scale 범위 검증
   if (scale < 0.1 || scale > 2.0) {
@@ -180,7 +163,6 @@ export async function enqueueExport(params: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Cookie: `token_v2=${token}`,
     },
     credentials: "include",
     body: JSON.stringify(requestBody),
@@ -212,7 +194,6 @@ export async function enqueueExport(params: {
  */
 export async function pollExportTask(
   taskId: string,
-  token: string,
   maxAttempts: number = 30
 ): Promise<string> {
   console.log("[notionPrivateApi] 작업 상태 확인 중:", taskId);
@@ -222,7 +203,6 @@ export async function pollExportTask(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `token_v2=${token}`,
       },
       credentials: "include",
       body: JSON.stringify({
@@ -277,14 +257,13 @@ export async function pollExportTask(
 export async function exportPageWithScale(params: {
   pageId: string;
   scale: number;
-  token: string;
 }): Promise<string> {
-  const { pageId, scale, token } = params;
+  const { pageId, scale } = params;
 
   console.log("[notionPrivateApi] Export 프로세스 시작:", { pageId, scale });
 
   // 1. 페이지 정보 조회
-  const { spaceId } = await getPageInfo(pageId, token);
+  const { spaceId } = await getPageInfo(pageId);
   console.log("[notionPrivateApi] spaceId 조회 완료:", spaceId);
 
   // 2. Export 작업 생성
@@ -292,11 +271,10 @@ export async function exportPageWithScale(params: {
     pageId,
     spaceId,
     scale,
-    token,
   });
 
   // 3. 작업 완료 대기
-  const exportURL = await pollExportTask(taskId, token);
+  const exportURL = await pollExportTask(taskId);
 
   return exportURL;
 }

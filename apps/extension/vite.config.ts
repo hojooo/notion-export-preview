@@ -13,7 +13,7 @@ export default defineConfig({
         description: pkg.description,
         version: pkg.version,
         manifest_version: 3,
-        permissions: ["downloads", "scripting", "activeTab", "storage", "offscreen", "cookies"],
+        permissions: ["downloads", "scripting", "activeTab", "storage", "cookies"],
         host_permissions: [
           "https://www.notion.so/*"
         ],
@@ -34,7 +34,7 @@ export default defineConfig({
         ],
       },
       additionalInputs: {
-        html: ["src/viewer/index.html", "src/offscreen/index.html"],
+        html: ["src/viewer/index.html"],
       },
     }),
   ],
