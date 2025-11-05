@@ -67,22 +67,46 @@ async function renderPDF(url: string = pdfSrc || "") {
     // 모든 페이지 렌더링
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.5 });
 
-      // 해당 페이지용 Canvas 생성
+      // 화면에 보이는 CSS 상의 배율 (기존 시각 크기 유지)
+      const cssScale = 1.5;
+      const viewport = page.getViewport({ scale: cssScale });
+
+      // 고해상도(HiDPI) 캔버스 출력을 위한 실제 픽셀 배율
+      // 과도한 메모리 사용을 방지하기 위해 페이지 면적 기준으로 클램프 처리
+      const deviceScale = Math.max(1, window.devicePixelRatio || 1);
+      const maxMegaPixels = 16; // 대략 16MP 한도로 제한
+      const pageArea = viewport.width * viewport.height;
+      const safeScale = Math.min(
+        deviceScale,
+        Math.sqrt((maxMegaPixels * 1_000_000) / Math.max(1, pageArea))
+      );
+
+      // 캔버스 생성 및 크기 설정 (스타일 크기와 실제 픽셀 크기를 분리)
       const canvas = document.createElement("canvas");
       canvas.className = "pdf-page";
       const context = canvas.getContext("2d");
       if (!context) continue;
 
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      const outputWidth = Math.floor(viewport.width * safeScale);
+      const outputHeight = Math.floor(viewport.height * safeScale);
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
 
-      // 페이지 렌더링
-      await page.render({
-        canvasContext: context,
-        viewport: viewport,
-      }).promise;
+      // 일부 이미지 콘텐츠의 계단 현상을 줄이기 위한 힌트
+      // (벡터 텍스트는 배율에 따라 선명도가 확보됨)
+      context.imageSmoothingEnabled = true;
+
+      // 페이지 렌더링 (고해상도 출력 전환을 위해 transform 사용)
+      await page
+        .render({
+          canvasContext: context,
+          viewport,
+          transform: [safeScale, 0, 0, safeScale, 0, 0],
+        })
+        .promise;
 
       container.appendChild(canvas);
     }

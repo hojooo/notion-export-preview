@@ -13,11 +13,6 @@ export interface ExportResult {
 }
 
 /**
- * Notion 페이지 컨텍스트
- */
-// Notion 컨텍스트 타입은 필요 시 각 호출부에서 정의/조합합니다.
-
-/**
  * Export 작업 상태
  */
 interface TaskStatus {
@@ -39,8 +34,6 @@ function generateUUID(): string {
     return v.toString(16);
   });
 }
-
-// 주의: 수동 Cookie 헤더는 MV3에서 금지됨. fetch의 credentials 옵션으로 인증을 위임합니다.
 
 /**
  * URL에서 Notion 페이지 ID 추출
